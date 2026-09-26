@@ -25,7 +25,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from config import settings
+from config import settings, published_version
 from database import get_connection
 from files import router as files_router
 from lantek import router as lantek_router, background_cache_loop
@@ -112,14 +112,8 @@ def get_version(app: str = Query("sm", description="App identifier: 'sm', 'pe', 
     Use ?app=sm for Sheet Manager, ?app=pe for Project Explorer,
     ?app=nest for Heidi-Nest.
     """
-    if app.lower() == "pe":
-        ver = settings.pe_version
-    elif app.lower() == "nest":
-        ver = settings.nest_version
-    else:
-        ver = settings.sm_version
     return {
-        "version": ver,
+        "version": published_version(app),
         "download_hint": settings.app_download_hint,
     }
 
@@ -1352,14 +1346,8 @@ def get_update_manifest(app: str = Query("sm", description="App identifier: 'sm'
             "size": path.stat().st_size,
         })
 
-    if app.lower() == "pe":
-        version = settings.pe_version
-    elif app.lower() == "nest":
-        version = settings.nest_version
-    else:
-        version = settings.sm_version
     return {
-        "version": version,
+        "version": published_version(app),
         "files": manifest,
     }
 

@@ -21,6 +21,35 @@ def _read_version(path: Path) -> str:
         return "0.0.0"
 
 
+_VERSION_MARKER_NAMES = {"pe": "pe-version.txt", "nest": "nest-version.txt", "sm": "sm-version.txt"}
+_VERSION_FALLBACK_FILES = {"pe": _PE_VERSION_FILE, "nest": _NEST_VERSION_FILE, "sm": _SM_VERSION_FILE}
+
+
+def published_version(app: str) -> str:
+    """The version actually being served to update-checker clients right
+    now for `app` ('sm'/'pe'/'nest').
+
+    Reads the *-version.txt marker each app's own deploy-to-stable step
+    writes into update_dir (e.g. pe_publish_stable.bat for PE) -- i.e. what
+    was deliberately PUBLISHED, not whatever the live source tree's own
+    VERSION.txt currently says. Those two used to be the same file, which
+    meant bumping VERSION.txt for a local dev-iteration build (done on
+    every single test cycle) immediately changed what this server
+    advertised to every shop-floor machine polling /version, even though
+    the actual files in update_dir -- what /update/manifest and
+    /update/file actually hand out -- hadn't changed at all. Falls back to
+    the live source VERSION.txt only if update_dir isn't configured or
+    nothing's been published there yet (e.g. a fresh checkout, or an app
+    -- today, 'sm' -- whose own deploy script doesn't write a marker yet).
+    """
+    app = app.lower()
+    if settings.update_dir:
+        marker = Path(settings.update_dir) / _VERSION_MARKER_NAMES.get(app, _VERSION_MARKER_NAMES["sm"])
+        if marker.is_file():
+            return _read_version(marker)
+    return _read_version(_VERSION_FALLBACK_FILES.get(app, _SM_VERSION_FILE))
+
+
 class Settings(BaseSettings):
     # MySQL connection
     db_host: str = "192.168.52.104"
@@ -49,11 +78,10 @@ class Settings(BaseSettings):
     lantek_material_map_table: str = "DIS_MMTT_MMTT_00000100"
     lantek_owned_files_table: str = "SYST_OWND_00000100"
 
-    # Application versions (read from per-app VERSION files at startup)
-    sm_version: str = _read_version(_SM_VERSION_FILE)
-    pe_version: str = _read_version(_PE_VERSION_FILE)
-    nest_version: str = _read_version(_NEST_VERSION_FILE)
-    app_version: str = sm_version  # backward compat / default
+    # Application versions -- see published_version() above. NOT stored here
+    # as fields: that used to read each app's live source VERSION.txt once
+    # at server startup, which drifted from what was actually published the
+    # moment anyone bumped VERSION.txt for a local dev build.
     app_download_hint: str = ""
     update_dir: str = ""          # folder with latest build (e.g. build/deploy)
 
